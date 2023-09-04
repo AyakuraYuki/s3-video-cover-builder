@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"defo-server/plugins/crypto"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
@@ -16,8 +17,10 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"reflect"
 	"regexp"
 	"strings"
+	"unsafe"
 )
 
 var (
@@ -30,6 +33,23 @@ func init() {
 	Extension = os.Getenv("EXTENSION")
 	ThumbWidth = os.Getenv("THUMB_WIDTH")
 	MimeType = os.Getenv("MIME_TYPE")
+}
+
+// slice string to bytes
+func slice(s string) (b []byte) {
+	pBytes := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	pString := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	pBytes.Data = pString.Data
+	pBytes.Len = pString.Len
+	pBytes.Cap = pString.Len
+	return
+}
+
+// md5Str returns a string's md5
+func md5Str(str string) string {
+	h := md5.New()
+	h.Write(slice(str))
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // download s3 object and save to local file
@@ -122,7 +142,7 @@ func handler(ctx context.Context, s3Event events.S3Event) (string, error) {
 	for _, record := range s3Event.Records {
 		bucket := record.S3.Bucket.Name
 		key := record.S3.Object.Key
-		md5 := crypto.Md5Str(key)
+		md5 := md5Str(key)
 		keyExt := path.Ext(key)
 		resultKey := assembleResultKey(key)
 		workDir := os.TempDir()
